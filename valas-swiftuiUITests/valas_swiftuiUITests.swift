@@ -23,12 +23,17 @@ final class valas_swiftuiUITests: XCTestCase {
     }
 
     @MainActor
-    func testExample() throws {
-        // UI tests must launch the application that they test.
+    func testAppLaunchesWithCurrencyConverter() throws {
         let app = XCUIApplication()
         app.launch()
-
-        // Use XCTAssert and related functions to verify your tests produce the correct results.
+        
+        // Verify the amount input exists
+        let amountInput = app.textFields["amount_input"]
+        XCTAssertTrue(amountInput.waitForExistence(timeout: 5))
+        
+        // Verify swap button exists
+        let swapButton = app.buttons["swap_button"]
+        XCTAssertTrue(swapButton.exists)
     }
 
     @MainActor
