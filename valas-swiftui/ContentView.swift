@@ -12,19 +12,49 @@ struct ContentView: View {
     @StateObject private var viewModel = CurrencyConverterViewModel.make()
     
     var body: some View {
+#if os(macOS)
+        NavigationView {
+            // Left sidebar - Input controls
+            VStack(spacing: 24) {
+                amountInputSection
+                currencyPickersSection
+                Spacer()
+            }
+            .padding()
+            .frame(minWidth: 300, idealWidth: 350, maxWidth: 400)
+            .navigationTitle("Input")
+            
+            // Right detail view - Results
+            ScrollView {
+                VStack(spacing: 24) {
+                    conversionResultSection
+                    rateHistoryChartSection
+                }
+                .padding()
+            }
+            .frame(minWidth: 400, idealWidth: 600, maxWidth: .infinity,
+                   minHeight: 600)
+            .navigationTitle("Results")
+            .overlay {
+                if viewModel.isLoading {
+                    ProgressView()
+                        .scaleEffect(1.5)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .background(Color.black.opacity(0.1))
+                }
+            }
+        }
+        .onAppear {
+            viewModel.viewDidLoad()
+        }
+#else
+        // iOS - Single column view
         NavigationView {
             ScrollView {
                 VStack(spacing: 24) {
-                    // Amount Input Section
                     amountInputSection
-                    
-                    // Currency Pickers Section
                     currencyPickersSection
-                    
-                    // Conversion Result Section
                     conversionResultSection
-                    
-                    // Rate History Chart Section
                     rateHistoryChartSection
                 }
                 .padding()
@@ -42,6 +72,8 @@ struct ContentView: View {
                 }
             }
         }
+        .navigationViewStyle(.stack)
+#endif
     }
     
     // MARK: - Amount Input Section
@@ -54,7 +86,9 @@ struct ContentView: View {
             
             TextField("Enter amount", text: $viewModel.amount)
                 .textFieldStyle(RoundedBorderTextFieldStyle())
+#if os(iOS)
                 .keyboardType(.decimalPad)
+#endif
                 .font(.title2)
                 .accessibilityIdentifier("amount_input")
         }
@@ -89,7 +123,7 @@ struct ContentView: View {
             )
         }
         .padding()
-        .background(Color(.systemGray6))
+        .background(Color.gray.opacity(0.15))
         .cornerRadius(12)
     }
     
@@ -140,7 +174,7 @@ struct ContentView: View {
                 }
                 .padding()
                 .frame(maxWidth: .infinity)
-                .background(Color(.systemGray6))
+                .background(Color.gray.opacity(0.15))
                 .cornerRadius(12)
             }
         }
@@ -196,7 +230,7 @@ struct ContentView: View {
                     }
                 }
                 .padding()
-                .background(Color(.systemGray6))
+                .background(Color.gray.opacity(0.15))
                 .cornerRadius(12)
                 .accessibilityIdentifier("rate_chart")
             }
