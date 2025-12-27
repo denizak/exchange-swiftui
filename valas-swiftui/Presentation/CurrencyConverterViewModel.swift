@@ -141,7 +141,23 @@ final class CurrencyConverterViewModel: ObservableObject {
         } catch {
             await MainActor.run {
                 self.isLoading = false
-                self.errorMessage = "Failed to fetch exchange rates. Please try again."
+                
+                // Provide more specific error messages
+                if let urlError = error as? URLError {
+                    switch urlError.code {
+                    case .notConnectedToInternet:
+                        self.errorMessage = "No internet connection. Please check your network."
+                    case .cannotFindHost, .cannotConnectToHost:
+                        self.errorMessage = "Cannot reach the server. Please check your connection or try again later."
+                    case .timedOut:
+                        self.errorMessage = "Request timed out. Please try again."
+                    default:
+                        self.errorMessage = "Network error occurred. Please try again."
+                    }
+                } else {
+                    self.errorMessage = "Failed to fetch exchange rates. Please try again."
+                }
+                
                 self.currentRate = nil
                 self.convertedAmount = ""
                 self.rateHistory = []
