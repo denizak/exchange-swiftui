@@ -64,6 +64,46 @@ final class GetExchangeRateUseCaseTests: XCTestCase {
         XCTAssertEqual(actualTarget, "JPY")
     }
     
+    func testExecute_onNetworkError_throwsError() async {
+        // Given
+        let sut = GetExchangeRateUseCase(fetchLatestRate: { _, _ in
+            throw ExchangeRateError.networkError
+        })
+        
+        // When/Then
+        do {
+            _ = try await sut.execute(base: "EUR", target: "USD")
+            XCTFail("Expected to throw networkError")
+        } catch let error as ExchangeRateError {
+            XCTAssertEqual(error, .networkError)
+        } catch {
+            XCTFail("Unexpected error type: \(error)")
+        }
+    }
+    
+    func testExecute_withDifferentCurrencyPairs() async throws {
+        // Given
+        let testCases = [
+            ("EUR", "USD", 1.05),
+            ("GBP", "JPY", 180.50),
+            ("CHF", "CAD", 1.52)
+        ]
+        
+        for (base, target, expectedRate) in testCases {
+            let sut = GetExchangeRateUseCase(fetchLatestRate: { _, _ in
+                ExchangeRate(base: base, target: target, rate: expectedRate, date: Date())
+            })
+            
+            // When
+            let result = try await sut.execute(base: base, target: target)
+            
+            // Then
+            XCTAssertEqual(result.base, base, "Base currency mismatch for \(base)/\(target)")
+            XCTAssertEqual(result.target, target, "Target currency mismatch for \(base)/\(target)")
+            XCTAssertEqual(result.rate, expectedRate, "Rate mismatch for \(base)/\(target)")
+        }
+    }
+    
     func testLeak() {
         let sut = GetExchangeRateUseCase(fetchLatestRate: { _, _ in nil })
         testMemoryLeak(sut)

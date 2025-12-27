@@ -45,7 +45,7 @@ final class CurrencyConverterViewModel: ObservableObject {
     // MARK: - Public Methods
     
     func viewDidLoad() {
-        Task { @MainActor in
+        Task {
             await loadCurrencies()
             await fetchRates()
         }
@@ -65,7 +65,7 @@ final class CurrencyConverterViewModel: ObservableObject {
             .debounce(for: .milliseconds(500), scheduler: RunLoop.main)
             .removeDuplicates()
             .sink { [weak self] _ in
-                Task { @MainActor in
+                Task {
                     await self?.fetchRates()
                 }
             }
@@ -76,66 +76,76 @@ final class CurrencyConverterViewModel: ObservableObject {
             .dropFirst()
             .debounce(for: .milliseconds(300), scheduler: RunLoop.main)
             .sink { [weak self] _, _ in
-                Task { @MainActor in
+                Task {
                     await self?.fetchRates()
                 }
             }
             .store(in: &cancellables)
     }
     
-    @MainActor
     private func loadCurrencies() async {
         do {
-            currencies = try await getCurrencies.execute()
+            // Network call happens off main thread
+            let fetchedCurrencies = try await getCurrencies.execute()
             
-            // Set default currencies if available
-            if let eur = currencies.first(where: { $0.code == "EUR" }) {
-                baseCurrency = eur
-            }
-            if let usd = currencies.first(where: { $0.code == "USD" }) {
-                targetCurrency = usd
+            // Update UI properties on main thread
+            await MainActor.run {
+                self.currencies = fetchedCurrencies
+                
+                // Set default currencies if available
+                if let eur = fetchedCurrencies.first(where: { $0.code == "EUR" }) {
+                    self.baseCurrency = eur
+                }
+                if let usd = fetchedCurrencies.first(where: { $0.code == "USD" }) {
+                    self.targetCurrency = usd
+                }
             }
         } catch {
             // Fallback to default currencies
-            currencies = Currency.defaultCurrencies
+            await MainActor.run {
+                self.currencies = Currency.defaultCurrencies
+            }
         }
     }
     
-    @MainActor
     func fetchRates() async {
-        guard baseCurrency.code != targetCurrency.code else {
-            currentRate = 1.0
-            updateConvertedAmount()
-            rateHistory = []
+        let base = await MainActor.run { baseCurrency.code }
+        let target = await MainActor.run { targetCurrency.code }
+        
+        guard base != target else {
+            await MainActor.run {
+                currentRate = 1.0
+                updateConvertedAmount()
+                rateHistory = []
+            }
             return
         }
         
-        isLoading = true
-        errorMessage = nil
+        await MainActor.run { 
+            isLoading = true
+            errorMessage = nil
+        }
         
         do {
-            // Fetch current rate
-            let rate = try await getExchangeRate.execute(
-                base: baseCurrency.code,
-                target: targetCurrency.code
-            )
-            currentRate = rate.rate
-            updateConvertedAmount()
+            // Network calls happen off main thread
+            let rate = try await getExchangeRate.execute(base: base, target: target)
+            let history = try await getRateHistory.execute(base: base, target: target, days: 7)
             
-            // Fetch 7-day history
-            rateHistory = try await getRateHistory.execute(
-                base: baseCurrency.code,
-                target: targetCurrency.code,
-                days: 7
-            )
-            
-            isLoading = false
+            // Update UI properties on main thread
+            await MainActor.run {
+                self.currentRate = rate.rate
+                self.updateConvertedAmount()
+                self.rateHistory = history
+                self.isLoading = false
+            }
         } catch {
-            isLoading = false
-            errorMessage = "Failed to fetch exchange rates. Please try again."
-            currentRate = nil
-            convertedAmount = ""
-            rateHistory = []
+            await MainActor.run {
+                self.isLoading = false
+                self.errorMessage = "Failed to fetch exchange rates. Please try again."
+                self.currentRate = nil
+                self.convertedAmount = ""
+                self.rateHistory = []
+            }
         }
     }
     

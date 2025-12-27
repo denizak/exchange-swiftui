@@ -6,6 +6,7 @@
 //
 
 import Testing
+import Foundation
 @testable import valas_swiftui
 
 struct valas_swiftuiTests {

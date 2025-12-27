@@ -73,6 +73,63 @@ final class GetRateHistoryUseCaseTests: XCTestCase {
         XCTAssertEqual(actualTarget, "CHF")
     }
     
+    func testExecute_withDifferentDayRanges() async throws {
+        // Given
+        let testCases = [7, 14, 30]
+        let fixedDate = Date()
+        let calendar = Calendar.current
+        
+        for days in testCases {
+            var capturedStartDate: Date?
+            
+            let sut = GetRateHistoryUseCase(
+                fetchRateHistory: { _, _, startDate, _ in
+                    capturedStartDate = startDate
+                    return []
+                },
+                calendar: calendar,
+                currentDate: { fixedDate }
+            )
+            
+            // When
+            _ = try await sut.execute(base: "EUR", target: "USD", days: days)
+            
+            // Then
+            let expectedStartDate = calendar.date(byAdding: .day, value: -days, to: fixedDate)
+            XCTAssertEqual(capturedStartDate, expectedStartDate, "Start date mismatch for \(days) days")
+        }
+    }
+    
+    func testExecute_onNetworkError_throwsError() async {
+        // Given
+        let sut = GetRateHistoryUseCase(fetchRateHistory: { _, _, _, _ in
+            throw ExchangeRateError.networkError
+        })
+        
+        // When/Then
+        do {
+            _ = try await sut.execute(base: "EUR", target: "USD", days: 7)
+            XCTFail("Expected to throw networkError")
+        } catch let error as ExchangeRateError {
+            XCTAssertEqual(error, .networkError)
+        } catch {
+            XCTFail("Unexpected error type: \(error)")
+        }
+    }
+    
+    func testExecute_returnsEmptyArray_whenNoHistoryAvailable() async throws {
+        // Given
+        let sut = GetRateHistoryUseCase(fetchRateHistory: { _, _, _, _ in
+            []
+        })
+        
+        // When
+        let result = try await sut.execute(base: "EUR", target: "USD", days: 7)
+        
+        // Then
+        XCTAssertTrue(result.isEmpty)
+    }
+    
     func testLeak() {
         let sut = GetRateHistoryUseCase(fetchRateHistory: { _, _, _, _ in [] })
         testMemoryLeak(sut)
