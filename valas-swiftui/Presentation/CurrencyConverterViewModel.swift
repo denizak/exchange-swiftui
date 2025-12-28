@@ -52,9 +52,7 @@ final class CurrencyConverterViewModel: ObservableObject {
     }
     
     func swapCurrencies() {
-        let temp = baseCurrency
-        baseCurrency = targetCurrency
-        targetCurrency = temp
+        (targetCurrency, baseCurrency) = (baseCurrency, targetCurrency)
     }
     
     // MARK: - Private Methods
